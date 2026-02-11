@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Softair OS V170 - Spectator</title>
+<style>
+    /* --- STILI BASE (V160) --- */
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; font-family: 'Courier New', monospace; touch-action: manipulation; }
+    html, body { background-color: #050505; color: #0f0; margin: 0; height: 100%; width: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; position: fixed; }
+    #phone-frame { width: 100%; max-width: 450px; height: 100%; max-height: 900px; background-color: #000; border: 2px solid #333; display: flex; flex-direction: column; position: relative; overflow: hidden; box-shadow: 0 0 50px rgba(0,255,0,0.1); }
+
+    .view-screen { display: none; height: 100%; width: 100%; flex-direction: column; padding: 15px; overflow-y: auto; background: #111; }
+    .active { display: flex; }
+    .hidden { display: none !important; }
+
+    /* STATUS BAR */
+    #status-bar { height: 35px; background: #000; color: #444; font-size: 12px; display: flex; align-items: center; justify-content: space-between; padding: 0 10px; border-bottom: 1px solid #222; flex-shrink: 0; }
+    #btn-exit-game { font-size: 20px; color: #888; cursor: pointer; padding: 5px 15px; font-weight: bold; border-right: 1px solid #333; margin-right: 10px; }
+
+    /* LCD PANEL */
+    #lcd-panel { background: radial-gradient(circle, #001a00 0%, #000 100%); border-bottom: 4px solid #222; height: 30%; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: background 0.3s; position: relative; z-index: 10; }
+    #lcd-1 { font-size: 16px; color: #0a0; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; font-weight: bold; width: 100%; text-align: center; }
+    #lcd-2 { font-size: 55px; font-weight: bold; color: #dfd; line-height: 0.9; text-shadow: 0 0 15px #0f0; font-family: sans-serif; }
+    #lcd-3 { font-size: 20px; font-weight: bold; color: #ff0; margin-top: 10px; letter-spacing: 4px; min-height: 24px; text-shadow: 0 0 5px #ff0;}
+    
+    #prog-bar-box { width: 80%; height: 8px; background: #222; border: 1px solid #555; margin-top: 15px; display: none; border-radius: 4px; overflow: hidden; }
+    #prog-bar-fill { height: 100%; width: 0%; background: #ff0; transition: width 0.1s linear; box-shadow: 0 0 10px #ff0; }
+
+    /* CONFIG UI */
+    .menu-btn { background: linear-gradient(90deg, #1a1a1a 0%, #222 100%); border: 1px solid #0f0; border-left: 5px solid #0f0; color: #0f0; padding: 18px; margin-bottom: 10px; width: 100%; font-size: 18px; font-weight: bold; text-align: left; border-radius: 2px; cursor: pointer; position: relative; }
+    .conf-section { border: 1px solid #333; padding: 10px; margin-bottom: 15px; background: #0a0a0a; }
+    .conf-title { color: #0f0; border-bottom: 1px solid #333; margin-bottom: 10px; padding-bottom: 2px; font-size: 14px; font-weight: bold; }
+    label { color: #888; display: block; margin-top: 12px; font-size: 12px; }
+    select, input, textarea { background: #222; color: white; border: 1px solid #444; padding: 10px; width: 100%; font-size: 16px; margin-bottom: 5px; border-radius: 0; appearance: none; }
+    .btn-red { background: #900; border-color: red; border-left-color: red; color: white; text-align: center; margin-top: 20px; }
+    .btn-gray { background: #333; border-color: #555; border-left-color: #555; color: #aaa; text-align: center; padding: 10px; }
+
+    /* TOGGLE SWITCH */
+    .toggle-row { display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; border: 1px solid #333; margin-top: 10px; border-radius: 4px; }
+    .switch { position: relative; display: inline-block; width: 50px; height: 26px; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 34px; border: 2px solid #555; }
+    .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px; background-color: white; transition: .4s; border-radius: 50%; }
+    input:checked + .slider { background-color: #0f0; border-color: #0f0; }
+    input:checked + .slider:before { transform: translateX(24px); }
+
+    /* ASSASSIN ROSTER STYLES */
+    #ass-roster-list { max-height: 200px; overflow-y: auto; border: 1px solid #333; background: #000; padding: 5px; display: flex; flex-direction: column; gap: 2px; margin-top: 5px; }
+    .roster-item { display: flex; justify-content: space-between; align-items: center; background: #111; padding: 8px; border: 1px solid #222; }
+    .roster-name { color: #fff; font-weight: bold; font-size: 14px; }
+    .roster-toggle { width: 20px; height: 20px; border: 1px solid #666; background: #222; cursor: pointer; display: flex; justify-content: center; align-items: center; margin-right: 10px; }
+    .roster-toggle.active { background: #0f0; border-color: #0f0; box-shadow: 0 0 5px #0f0; }
+    .roster-del { color: #500; font-weight: bold; cursor: pointer; padding: 0 5px; }
+
+    /* KEYPAD & DRAWER */
+    #keypad { display: grid; gap: 6px; flex-grow: 1; margin-top: 10px; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(4, 1fr); 
+              grid-template-areas: "n1 n2 n3 btnA" "n4 n5 n6 btnB" "n7 n8 n9 btnC" "ast n0 ent btnD"; }
+    .key { background: #1a1a1a; border: 1px solid #333; color: white; font-size: 24px; font-weight: bold; display: flex; justify-content: center; align-items: center; border-radius: 4px; box-shadow: 0 3px 0 #000; }
+    .key:active { background: #333; transform: translateY(2px); box-shadow: 0 1px 0 #000; }
+    .k-red { background: #600; border-color: #800; grid-area: btnA; } 
+    #k-a { font-size: 10px; line-height: 12px; text-align: center; flex-direction: column; color:#ddd; text-transform: uppercase; }
+    
+    .k-blu { background: #006; border-color: #008; grid-area: btnB; }
+    .k-yel { background: #660; border-color: #880; grid-area: btnC; } 
+    .k-grn { background: #060; border-color: #080; grid-area: btnD; }
+    #k-1 { grid-area: n1; } #k-2 { grid-area: n2; } #k-3 { grid-area: n3; } #k-4 { grid-area: n4; } 
+    #k-5 { grid-area: n5; } #k-6 { grid-area: n6; } #k-7 { grid-area: n7; } #k-8 { grid-area: n8; } 
+    #k-9 { grid-area: n9; } #k-0 { grid-area: n0; } #k-star { grid-area: ast; } #k-ent { grid-area: ent; }
+
+    #drawer-handle { margin-top:auto; background: repeating-linear-gradient(45deg, #111, #111 10px, #222 10px, #222 20px); color: #888; text-align: center; padding: 15px; border: 2px solid #444; border-radius: 4px; cursor: pointer; text-transform: uppercase; font-weight: bold; font-size: 12px; letter-spacing: 2px; }
+    #cable-overlay { position: absolute; top: auto; bottom: 0; left: 0; width: 100%; height: 68%; background: #080808; z-index: 50; padding: 20px; display: none; flex-direction: column; border-top: 4px dashed orange; box-shadow: 0 -5px 20px #000; }
+    .wire-row { display: flex; align-items: center; margin-bottom: 25px; height: 60px; cursor: pointer; position: relative; }
+    .wire-label { width: 50px; font-weight: bold; font-size: 14px; text-shadow: 0 0 5px currentColor; }
+    .wire-vis { flex-grow: 1; height: 16px; margin: 0 10px; position: relative; background: #000; border-radius: 10px; box-shadow: inset 0 1px 3px #fff; }
+    .wire-vis::before, .wire-vis::after { content:''; position: absolute; width: 24px; height: 24px; background: #444; border: 1px solid #777; border-radius: 50%; top:-4px; z-index: 2; }
+    .wire-vis::before { left: -5px; } .wire-vis::after { right: -5px; }
+    .wire-line { width: 100%; height: 100%; transition: all 0.2s; border-radius: 10px; opacity: 0.9; box-shadow: 0 2px 5px rgba(0,0,0,0.8); }
+    .cut .wire-line { width: 40%; opacity: 0.4; } 
+    .w-blu .wire-line { background: #2196F3; } .w-yel .wire-line { background: #FFEB3B; } 
+    .w-grn .wire-line { background: #4CAF50; } .w-red .wire-line { background: #F44336; }
+
+    /* PAGINE FULL SCREEN */
+    .fs-page { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 100; display: none; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+    .bg-red { background-color: #900; color: white; }
+    .bg-green { background-color: #050; color: #0f0; }
+    .bg-grey { background-color: #222; color: #ccc; }
+    
+    .big-msg { font-size: 50px; font-weight: bold; text-shadow: 2px 2px 0 #000; margin-bottom: 20px; }
+    .sub-msg { font-size: 20px; color: #fff; margin-bottom: 40px; }
+    .fs-btn { border: 2px solid white; background: rgba(0,0,0,0.5); color: white; padding: 15px 30px; font-size: 20px; cursor: pointer; font-weight: bold; margin-top:20px; }
+
+    /* REPORT BOX */
+    #report-box { width: 90%; max-height: 50%; overflow-y: auto; background: rgba(0,0,0,0.5); border: 1px solid #555; padding: 10px; text-align: left; margin-bottom: 20px; }
+    .rep-row { display: flex; justify-content: space-between; border-bottom: 1px solid #444; padding: 8px 0; font-size: 14px; font-weight: bold; }
+    .st-boom { color: #f55; } .st-def { color: #0f0; } .st-idle { color: #888; } .st-arm { color: yellow; }
+
+    /* OVERLAYS */
+    #ass-overlay { position: absolute; top:0; left:0; width:100%; height:100%; z-index:200; background:rgba(50,0,0,0.95); display:none; flex-direction:column; justify-content:center; align-items:center; border: 4px solid red; }
+    .ass-btn { width: 100%; padding: 20px; margin: 10px 0; font-size: 24px; font-weight: bold; border: 2px solid white; cursor: pointer; text-align: center; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+
+    /* SPECTATOR STYLES (NUOVO V170) */
+    #spec-header { color: #0f0; font-size: 24px; font-weight: bold; border-bottom: 2px solid #333; width: 100%; text-align: center; padding-bottom: 10px; margin-bottom: 10px; letter-spacing: 2px; }
+    #spec-scores { display: flex; justify-content: space-between; width: 100%; margin-bottom: 20px; }
+    .score-box { width: 48%; padding: 15px; text-align: center; font-size: 18px; font-weight: bold; border: 1px solid #333; border-radius: 4px; }
+    .score-box.def { background: #003300; border-color: #0f0; color: #0f0; }
+    .score-box.boom { background: #330000; border-color: #f00; color: #f00; }
+    .score-box span { display: block; font-size: 30px; margin-top: 5px; }
+    
+    #spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; overflow-y: auto; padding-bottom: 20px; }
+    .spec-card { background: #111; border: 1px solid #333; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 80px; position: relative; }
+    .spec-name { font-size: 12px; color: #888; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
+    .spec-status { font-size: 16px; font-weight: bold; }
+    .spec-timer { font-size: 20px; font-family: sans-serif; margin-top: 5px; color: #fff; }
+    
+    .spec-card-armed { border-color: red; background: radial-gradient(circle, #300, #000); animation: pulseRed 1s infinite; }
+    .spec-card-armed .spec-status { color: red; }
+    
+    .spec-card-defused { border-color: #0f0; background: #001a00; }
+    .spec-card-defused .spec-status { color: #0f0; }
+    
+    .spec-card-exploded { border-color: #555; background: #222; opacity: 0.7; }
+    .spec-card-exploded .spec-status { color: #888; text-decoration: line-through; }
+    
+    .spec-card-idle { border-color: #444; }
+    .spec-card-idle .spec-status { color: #666; }
+
+    @keyframes pulseRed { 0% { box-shadow: 0 0 5px #500; } 50% { box-shadow: 0 0 15px #f00; } 100% { box-shadow: 0 0 5px #500; } }
+</style>
+</head>
+<body>
+
+<div id="phone-frame">
+    <div id="status-bar">
+        <div style="display:flex; align-items:center;">
+            <div id="btn-exit-game" onclick="adminForceReset()">&lt;</div>
+            <span id="conn-status" style="color:red">...</span>
+        </div>
+        <span id="players-count">P:0</span>
+    </div>
+
+    <div id="lcd-panel">
+        <div id="lcd-1">SISTEMA</div>
+        <div id="lcd-2">PRONTO</div>
+        <div id="lcd-3"></div>
+        <div id="prog-bar-box"><div id="prog-bar-fill"></div></div>
+    </div>
+
+    <div id="page-boom" class="fs-page bg-red">
+        <div class="big-msg">BOOM</div>
+        <div class="sub-msg">BOMBA ESPLOSA</div>
+        <button class="fs-btn" onclick="adminForceReset()">RESET SISTEMA</button>
+    </div>
+
+    <div id="page-safe" class="fs-page bg-green">
+        <div class="big-msg">SAFE</div>
+        <div class="sub-msg">DISINNESCATA</div>
+        <button class="fs-btn" onclick="adminForceReset()">STOP PARTITA</button>
+    </div>
+
+    <div id="page-locked" class="fs-page bg-grey" style="z-index: 90;">
+        <div class="big-msg">LOCKED</div>
+        <div class="sub-msg">POSTAZIONE NON ATTIVA</div>
+    </div>
+
+    <div id="page-end" class="fs-page bg-grey">
+        <div class="big-msg">FINE</div>
+        <div class="sub-msg" id="end-reason">PARTITA TERMINATA</div>
+        <div id="report-box"></div>
+        <button class="fs-btn" onclick="adminForceReset()">TORNA AL MENU</button>
+    </div>
+
+    <div id="ass-overlay">
+        <h1 style="color:white; margin-bottom:5px; text-shadow: 0 0 10px black;">ASSASSINIO</h1>
+        <h2 id="ass-target" style="color:yellow; border:2px dashed yellow; padding:10px; font-size:28px; background: rgba(0,0,0,0.5);">TARGET</h2>
+        <h3 id="ass-dest" style="color:cyan; margin-top:5px;">>>></h3>
+        <div id="ass-timer" style="color:white; font-size:60px; margin:20px; font-weight:bold;">00:00</div>
+        <div class="ass-btn" style="color:red; border-color:red;" onclick="resolveAssassin(true)">💀 UCCISO</div>
+        <div class="ass-btn" style="color:#0f0; border-color:#0f0;" onclick="resolveAssassin(false)">🛡️ SALVATO</div>
+    </div>
+
+    <div id="screen-menu" class="view-screen active">
+        <div style="text-align:center; margin-bottom:20px; color:#444; font-size:10px;">TACTICAL OS V170.0</div>
+        
+        <div style="margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
+            <label>NOME POSTAZIONE:</label>
+            <input type="text" id="dev-name" placeholder="ES: ALPHA" onchange="saveName()" style="text-align:center; font-weight:bold; color:yellow;">
+        </div>
+
+        <button class="menu-btn" onclick="openConf('sabotage')">CONFIGURAZIONE PARTITA</button>
+        <button class="menu-btn btn-gray" onclick="openSpectator()">MODALITÀ SPETTATORE</button>
+        
+        <div style="margin-top:20px; border-top:1px solid #333; padding-top:10px;">
+            <label>PASSWORD ADMIN:</label><input type="password" id="admin-pass" value="0000" style="text-align:center;">
+        </div>
+    </div>
+
+    <div id="screen-conf" class="view-screen">
+        <button onclick="goHome()" class="menu-btn btn-gray" style="padding:10px; margin-bottom:15px;">&lt; TORNA AL MENU</button>
+        
+        <div id="opt-sab">
+            <h3 class="conf-title">PARAMETRI TATTICI</h3>
+            <label style="color:cyan;">GESTIONE DISPOSITIVI:</label>
+            <select id="sab-mode" onchange="updateSabUI()">
+                <option value="master">1. SOLO MASTER (Partita Singola)</option>
+                <option value="sequence">2. SEQUENZIALE (Staffetta)</option>
+                <option value="simul">3. SIMULTANEO (Guerra Totale)</option>
+            </select>
+            
+            <div id="div-end-cond-wrapper" class="hidden">
+                <label style="color:orange;">CONDIZIONE FINE PARTITA:</label>
+                <select id="sab-end-cond" onchange="updateSabUI()">
+                    <option value="time">TEMPO TOTALE</option>
+                    <option value="cycles">NUMERO CICLI</option>
+                </select>
+            </div>
+
+            <div id="conf-sab-time" class="hidden">
+                <label>DURATA PARTITA TOTALE (Min):</label><input type="number" id="sab-global-time" value="30">
+            </div>
+            <div id="conf-sab-cycles" class="hidden">
+                <label>NUMERO ROUND MAX:</label><input type="number" id="sab-cycles" value="3">
+            </div>
+            
+            <div style="border-top:1px dashed #555; margin-top:10px; padding-top:10px;">
+                <label>DURATA BOMBA (Min):</label><input type="number" id="sab-bomb-time" value="5">
+            </div>
+
+            <div class="conf-section">
+                <div class="conf-title">ATTIVAZIONE / DISATTIVAZIONE</div>
+                <label>METODO ARMA:</label><select id="sab-start" onchange="updateSabUI()"><option value="press">Pulsante A (Click)</option><option value="hold">Pulsante A (Tieni Premuto)</option><option value="code">Codice PIN</option><option value="conn">Collega Cavi</option><option value="timer">Timer Automatico</option></select>
+                <div id="conf-timer-arm" class="hidden"><label>RITARDO AUTO-ARM (Min):</label><input type="number" id="sab-arm-delay" value="1"></div>
+                <div id="conf-seq-arm" class="hidden" style="margin-left:10px; border-left:2px solid orange; padding-left:5px;">
+                    <label style="color:orange;">SEQUENZA COLLEGAMENTO:</label>
+                    <select id="seq-1"><option value="0">1°: BLU</option><option value="1">1°: GIA</option><option value="2">1°: VER</option><option value="3">1°: ROS</option></select>
+                    <select id="seq-2"><option value="1">2°: GIA</option><option value="0">2°: BLU</option><option value="2">2°: VER</option><option value="3">2°: ROS</option></select>
+                    <select id="seq-3"><option value="2">3°: VER</option><option value="0">3°: BLU</option><option value="1">3°: GIA</option><option value="3">3°: ROS</option></select>
+                    <select id="seq-4"><option value="3">4°: ROS</option><option value="0">4°: BLU</option><option value="1">4°: GIA</option><option value="2">4°: VER</option></select>
+                </div>
+                <label>METODO DISARMA:</label><select id="sab-stop" onchange="updateSabUI()"><option value="cut">Taglio Cavi</option><option value="code">Codice PIN</option><option value="press">Pulsante A (Click)</option><option value="hold">Pulsante A (Tieni Premuto)</option></select>
+                <div id="conf-hold-time" class="hidden"><label>DURATA PRESSIONE (Sec):</label><input type="number" id="sab-hold-time" value="3"></div>
+            </div>
+            
+            <div id="conf-wires" class="conf-section hidden">
+                <div class="conf-title">RUOLI CAVI (Al taglio)</div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#aaf">BLU:</span><select id="role-0" style="width:70%"><option value="def">DISINNESCO</option><option value="boom">ESPLOSIONE</option><option value="speed">VELOCITA 2X</option><option value="null">NEUTRO</option></select></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#ff0">GIA:</span><select id="role-1" style="width:70%"><option value="boom">ESPLOSIONE</option><option value="def">DISINNESCO</option><option value="speed">VELOCITA 2X</option><option value="null">NEUTRO</option></select></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#0f0">VER:</span><select id="role-2" style="width:70%"><option value="speed">VELOCITA 2X</option><option value="def">DISINNESCO</option><option value="boom">ESPLOSIONE</option><option value="null">NEUTRO</option></select></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><span style="color:#f00">ROS:</span><select id="role-3" style="width:70%"><option value="null">NEUTRO</option><option value="def">DISINNESCO</option><option value="boom">ESPLOSIONE</option><option value="speed">VELOCITA 2X</option></select></div>
+            </div>
+            
+            <div id="conf-pin-area" class="conf-section hidden">
+                <div class="conf-title">SICUREZZA PIN</div>
+                <label>PIN PARTITA:</label><input type="number" id="sab-pin" value="1234">
+                <label>PENALITÀ ERRORE:</label>
+                <select id="sab-pin-penalty">
+                    <option value="none">NESSUNA</option>
+                    <option value="speed">VELOCITÀ 2X (Speed Up)</option>
+                    <option value="time">MENO 1 MINUTO</option>
+                </select>
+            </div>
+            
+            <div class="toggle-row"><span class="toggle-label">PIN APERTURA CASSETTO</span><label class="switch"><input type="checkbox" id="sab-drawer-lock" onchange="updateSabUI()"><span class="slider"></span></label></div>
+            <div id="div-drawer-pin" class="hidden">
+                <label>PIN VANO:</label><input type="number" id="sab-drawer-pin" value="0000">
+                <label>PENALITÀ VANO:</label><select id="sab-drawer-pen"><option value="none">NESSUNA</option><option value="speed">VELOCITÀ 2X</option><option value="time">-1 MINUTO</option></select>
+            </div>
+
+            <div class="conf-section" style="border: 2px solid yellow; margin-top:20px;">
+                <div class="toggle-row" style="margin-top:0;">
+                    <span class="toggle-label" style="color:yellow; font-weight:bold;">EVENTO ASSASSINIO</span>
+                    <label class="switch"><input type="checkbox" id="ass-active" onchange="updateSabUI()"><span class="slider"></span></label>
+                </div>
+                <div id="ass-conf-box" class="hidden" style="padding-top:10px;">
+                    <label>INTERVALLO RANDOM (Min - Max):</label>
+                    <div style="display:flex; gap:5px;"><input type="number" id="ass-min" value="5"><input type="number" id="ass-max" value="15"></div>
+                    <label>DURATA CACCIA (Min):</label><input type="number" id="ass-dur" value="3">
+                    
+                    <div class="conf-title" style="margin-top:10px;">ROSTER GIOCATORI</div>
+                    <div style="display:flex; gap:5px; margin-bottom:5px;">
+                        <input type="text" id="new-ass-name" placeholder="NOME" style="flex-grow:1;">
+                        <button onclick="addAssName()" style="background:#333; color:#0f0; border:1px solid #0f0; width:40px;">+</button>
+                    </div>
+                    <div id="ass-roster-list"></div>
+                </div>
+            </div>
+            
+            <button id="btn-start-game" class="menu-btn btn-red" onclick="broadcastStart()">AVVIA PARTITA</button>
+        </div>
+    </div>
+
+    <div id="screen-game" class="view-screen">
+        <div id="keypad">
+            <div id="k-1" class="key num-k" onclick="kp('1')">1</div><div id="k-2" class="key num-k" onclick="kp('2')">2</div><div id="k-3" class="key num-k" onclick="kp('3')">3</div>
+            <div id="k-a" class="key k-red" onmousedown="btnDown('A')" onmouseup="btnUp('A')" ontouchstart="btnDown('A')" ontouchend="btnUp('A')">ATTIVA<br>DISATTIVA</div>
+            
+            <div id="k-4" class="key num-k" onclick="kp('4')">4</div><div id="k-5" class="key num-k" onclick="kp('5')">5</div><div id="k-6" class="key num-k" onclick="kp('6')">6</div>
+            <div id="k-b" class="key k-blu" onmousedown="btnDown('B')" onmouseup="btnUp('B')" ontouchstart="btnDown('B')" ontouchend="btnUp('B')">B</div>
+            <div id="k-7" class="key num-k" onclick="kp('7')">7</div><div id="k-8" class="key num-k" onclick="kp('8')">8</div><div id="k-9" class="key num-k" onclick="kp('9')">9</div>
+            <div id="k-c" class="key k-yel" onmousedown="btnDown('C')" onmouseup="btnUp('C')" ontouchstart="btnDown('C')" ontouchend="btnUp('C')">C</div>
+            <div id="k-star" class="key num-k" onclick="kp('*')">*</div><div id="k-0" class="key num-k" onclick="kp('0')">0</div><div id="k-ent" class="key num-k k-grn" onclick="kp('#')">OK</div>
+            <div id="k-d" class="key k-grn" onmousedown="btnDown('D')" onmouseup="btnUp('D')" ontouchstart="btnDown('D')" ontouchend="btnUp('D')">D</div>
+        </div>
+        <div id="drawer-handle" onclick="toggleDrawer()">::: VANO ELETTRONICO :::</div>
+    </div>
+
+    <div id="cable-overlay">
+        <div class="wire-row" onclick="cutWire(0)"><span class="wire-label" style="color:#aaf">BLU</span><div class="wire-vis w-blu" id="w-0"><div class="wire-line"></div></div></div>
+        <div class="wire-row" onclick="cutWire(1)"><span class="wire-label" style="color:#ff0">GIA</span><div class="wire-vis w-yel" id="w-1"><div class="wire-line"></div></div></div>
+        <div class="wire-row" onclick="cutWire(2)"><span class="wire-label" style="color:#0f0">VER</span><div class="wire-vis w-grn" id="w-2"><div class="wire-line"></div></div></div>
+        <div class="wire-row" onclick="cutWire(3)"><span class="wire-label" style="color:#f00">ROS</span><div class="wire-vis w-red" id="w-3"><div class="wire-line"></div></div></div>
+        <button class="menu-btn btn-gray" onclick="toggleDrawer()" style="margin-top:auto">CHIUDI SPORTELLO</button>
+    </div>
+
+    <div id="screen-spectator" class="view-screen">
+        <div id="spec-header">TACTICAL MONITOR</div>
+        <div id="spec-scores">
+            <div class="score-box def">SAFE: <span id="score-safe">0</span></div>
+            <div class="score-box boom">BOOM: <span id="score-boom">0</span></div>
+        </div>
+        <div id="spec-grid"></div>
+        <button onclick="goHome()" class="menu-btn btn-gray" style="margin-top:auto">ESCI</button>
+    </div>
+
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getDatabase, ref, set, onValue, update, onDisconnect, get } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
+
+    const firebaseConfig = { apiKey: "AIzaSyAul-dk062-EGB5Hrt9nD_3ZFM-ZX0nUAs", authDomain: "softairbomb-f3dd3.firebaseapp.com", databaseURL: "https://softairbomb-f3dd3-default-rtdb.firebaseio.com", projectId: "softairbomb-f3dd3", storageBucket: "softairbomb-f3dd3.firebasestorage.app", messagingSenderId: "928886693758", appId: "1:928886693758:web:aab4ea114bc0486debdd2f", measurementId: "G-3ZHRFYLR4G" };
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+    const myId = "OP_" + Math.floor(Math.random() * 9000 + 1000);
+    
+    let gameState = { status: 'lobby' };
+    let localState = 'lobby'; 
+    let tempPin = "";
+    let speedMultiplier = 1.0;
+    let holdTimer = null;
+    let enteringDrawerPin = false;
+    let userSeqInput = [];
+    let roster = JSON.parse(localStorage.getItem('ass_roster')) || [{name: "VIPER", active: true}, {name: "GHOST", active: true}];
+    let devName = localStorage.getItem('bomb_dev_name') || "POSTAZIONE " + Math.floor(Math.random()*100);
+    document.getElementById('dev-name').value = devName;
+    let playersData = {};
+    let lastSpeakSt = "lobby";
+
+    onValue(ref(db, ".info/connected"), s => {
+        let el = document.getElementById('conn-status');
+        el.innerText = s.val() ? "ONLINE" : "OFFLINE"; el.style.color = s.val() ? "#0f0" : "red";
+        if(s.val()) { onDisconnect(ref(db, 'players/' + myId)).remove(); set(ref(db, 'players/' + myId), { id: myId, state: 'online', name: devName }); }
+    });
+    onValue(ref(db, 'players'), s => { playersData = s.val() || {}; document.getElementById('players-count').innerText = "P:" + (s.val() ? Object.keys(s.val()).length : 0); });
+
+    onValue(ref(db, 'game'), (snap) => {
+        gameState = snap.val() || { status: 'lobby' };
+        applyGameState();
+    });
+
+    setInterval(() => { 
+        if(gameState.status === 'running') updateTimers(); 
+        // V170: Update Spectator UI frequently
+        if(document.getElementById('screen-spectator').classList.contains('active')) renderSpectatorUI();
+    }, 1000);
+
+    // ROSTER & NAME
+    window.saveName = function() {
+        devName = document.getElementById('dev-name').value.toUpperCase();
+        localStorage.setItem('bomb_dev_name', devName);
+        update(ref(db, 'players/'+myId), {name: devName});
+    };
+    function saveRoster() { localStorage.setItem('ass_roster', JSON.stringify(roster)); }
+    
+    window.renderRoster = function() {
+        let c = document.getElementById('ass-roster-list'); c.innerHTML = "";
+        roster.forEach((item, index) => {
+            c.innerHTML += `<div class="roster-item"><div class="roster-name" style="color:${item.active?'#fff':'#555'}">${item.name}</div><div style="display:flex;"><div class="roster-toggle ${item.active?'active':''}" onclick="toggleAss(${index})"></div><div class="roster-del" onclick="delAss(${index})">X</div></div></div>`;
+        });
+    };
+    window.addAssName = function() { let i = document.getElementById('new-ass-name'); let n = i.value.trim().toUpperCase(); if(n) { roster.push({name: n, active: true}); saveRoster(); i.value = ""; renderRoster(); } };
+    window.toggleAss = function(index) { roster[index].active = !roster[index].active; saveRoster(); renderRoster(); };
+    window.delAss = function(index) { roster.splice(index, 1); saveRoster(); renderRoster(); };
+
+    // UI
+    window.updateSabUI = function() {
+        let mode = document.getElementById('sab-mode').value;
+        let start = document.getElementById('sab-start').value;
+        let stop = document.getElementById('sab-stop').value;
+        let endCond = document.getElementById('sab-end-cond').value;
+        let lock = document.getElementById('sab-drawer-lock').checked;
+        let assAct = document.getElementById('ass-active').checked;
+
+        if(mode === 'master') {
+            document.getElementById('div-end-cond-wrapper').classList.add('hidden');
+            document.getElementById('conf-sab-time').classList.add('hidden');
+            document.getElementById('conf-sab-cycles').classList.add('hidden');
+        } else {
+            document.getElementById('div-end-cond-wrapper').classList.remove('hidden');
+            if(endCond === 'time') { document.getElementById('conf-sab-time').classList.remove('hidden'); document.getElementById('conf-sab-cycles').classList.add('hidden'); } 
+            else { document.getElementById('conf-sab-time').classList.add('hidden'); document.getElementById('conf-sab-cycles').classList.remove('hidden'); }
+        }
+        
+        if(start === 'timer') document.getElementById('conf-timer-arm').classList.remove('hidden'); else document.getElementById('conf-timer-arm').classList.add('hidden');
+        if(start === 'conn') document.getElementById('conf-seq-arm').classList.remove('hidden'); else document.getElementById('conf-seq-arm').classList.add('hidden');
+        if(stop === 'cut') document.getElementById('conf-wires').classList.remove('hidden'); else document.getElementById('conf-wires').classList.add('hidden');
+        if(start === 'code' || stop === 'code') document.getElementById('conf-pin-area').classList.remove('hidden'); else document.getElementById('conf-pin-area').classList.add('hidden');
+        if(start === 'hold' || stop === 'hold') document.getElementById('conf-hold-time').classList.remove('hidden'); else document.getElementById('conf-hold-time').classList.add('hidden');
+        
+        if(lock) document.getElementById('div-drawer-pin').classList.remove('hidden'); else document.getElementById('div-drawer-pin').classList.add('hidden');
+        if(assAct) { document.getElementById('ass-conf-box').classList.remove('hidden'); renderRoster(); } else document.getElementById('ass-conf-box').classList.add('hidden');
+    };
+
+    window.openSpectator = function() {
+        showScreen('screen-spectator');
+        renderSpectatorUI();
+    };
+
+    function renderSpectatorUI() {
+        if(!document.getElementById('screen-spectator').classList.contains('active')) return;
+
+        // SCORES
+        let s = gameState.score || { defused: 0, exploded: 0 };
+        document.getElementById('score-safe').innerText = s.defused;
+        document.getElementById('score-boom').innerText = s.exploded;
+
+        // GRID
+        let grid = document.getElementById('spec-grid');
+        grid.innerHTML = "";
+
+        // Combine players and states
+        let allIds = Object.keys(playersData);
+        if(allIds.length === 0) { grid.innerHTML = "<div style='color:#666;width:100%;text-align:center;'>NESSUNA POSTAZIONE</div>"; return; }
+
+        allIds.forEach(pid => {
+            let pName = playersData[pid].name || "UNKNOWN";
+            let pState = (gameState.sabStates && gameState.sabStates[pid]) ? gameState.sabStates[pid] : 'idle';
+            
+            // Override for Master in single mode
+            if(gameState.config && gameState.config.sabMode === 'master' && pid === gameState.masterId) {
+                pState = gameState.sabStates['masterState'];
+            }
+
+            let cssClass = "spec-card-idle";
+            let statusText = "STANDBY";
+            let timeText = "--:--";
+
+            if (pState === 'armed') {
+                cssClass = "spec-card-armed";
+                statusText = "ARMATA";
+                // Show global bomb timer if available
+                if(gameState.currentBombEndTime) {
+                    let diff = Math.ceil((gameState.currentBombEndTime - Date.now())/1000);
+                    timeText = diff > 0 ? fmt(diff) : "00:00";
+                }
+            } else if (pState === 'defused') {
+                cssClass = "spec-card-defused";
+                statusText = "DISINNESCATA";
+            } else if (pState === 'exploded') {
+                cssClass = "spec-card-exploded";
+                statusText = "ESPLOSA";
+            } else if (pState === 'locked') {
+                statusText = "LOCKED";
+            }
+
+            grid.innerHTML += `
+            <div class="spec-card ${cssClass}">
+                <div class="spec-name">${pName}</div>
+                <div class="spec-status">${statusText}</div>
+                ${pState === 'armed' ? `<div class="spec-timer">${timeText}</div>` : ''}
+            </div>
+            `;
+        });
+    }
+
+    function optimizeInterface(mode, config) {
+        document.getElementById('drawer-handle').style.display = 'none';
+        let allKeys = document.querySelectorAll('.key');
+        allKeys.forEach(k => k.style.display = 'none'); 
+        
+        if (mode === 'sabotage') {
+            let btnA = document.getElementById('k-a');
+            let start = config.start; let stop = config.stop;
+            if (start === 'press' || start === 'hold' || stop === 'press' || stop === 'hold') {
+                btnA.style.display = 'flex'; btnA.style.gridRow = '1 / span 4'; btnA.style.gridColumn = '4 / span 1'; 
+            }
+            if (start === 'code' || stop === 'code' || config.drawerLock) {
+                document.querySelectorAll('.num-k').forEach(e => e.style.display = 'flex');
+                if(btnA.style.display === 'flex') btnA.style.gridRow = '1 / span 1';
+            }
+            if (start === 'conn' || stop === 'cut') document.getElementById('drawer-handle').style.display = 'block';
+        } 
+    }
+
+    function applyGameState() {
+        if(gameState.status === 'lobby') {
+            // Keep spectator on spectator screen if active
+            if(!document.getElementById('screen-spectator').classList.contains('active')) {
+                showScreen('screen-menu');
+            }
+            resetOverlays();
+            localState = 'lobby'; 
+            lastSpeakSt = 'lobby';
+            speedMultiplier = 1.0;
+            document.getElementById('lcd-1').innerText = "SISTEMA";
+            document.getElementById('lcd-2').innerText = "PRONTO";
+            document.body.style.background = "#000";
+        }
+        else if(gameState.status === 'running') {
+            // Spectator remains spectator
+            if(!document.getElementById('screen-spectator').classList.contains('active')) {
+                showScreen('screen-game');
+                optimizeInterface('sabotage', gameState.config);
+                
+                if(localState === 'idle' && gameState.config.start === 'conn' && userSeqInput.length === 0) {
+                    for(let i=0; i<4; i++) document.getElementById('w-'+i).classList.add('cut');
+                }
+
+                handleSabotageLogic();
+
+                if(gameState.assassin && gameState.assassin.active) {
+                    document.getElementById('ass-overlay').style.display = 'flex';
+                    document.getElementById('ass-target').innerText = gameState.assassin.target;
+                    document.getElementById('ass-dest').innerText = ">>> " + (gameState.assassin.dest || "BASE");
+                } else {
+                    document.getElementById('ass-overlay').style.display = 'none';
+                }
+            }
+        }
+        else if(gameState.status === 'ended') {
+            // Spectator sees end summary in dashboard, player sees end screen
+            if(!document.getElementById('screen-spectator').classList.contains('active')) {
+                document.getElementById('page-end').style.display = 'flex';
+                document.getElementById('end-reason').innerText = gameState.result || "FINE PARTITA";
+                renderReport();
+                if(gameState.result !== 'BOOM' && lastSpeakSt !== 'ended') { speak("Attenzione, Attenzione. Fine Partita"); lastSpeakSt = 'ended'; }
+            }
+        }
+    }
+
+    function handleSabotageLogic() {
+        if(gameState.status === 'lobby') { resetOverlays(); return; }
+
+        let mode = gameState.config.sabMode;
+        let targets = gameState.sabStates || {}; 
+        let myState = targets[myId];
+        
+        if(mode === 'master') { if(myId === gameState.masterId) { myState = targets['masterState']; } }
+        else if(mode === 'sequence') { if(gameState.currentTarget === myId) myState = targets[myId]; }
+        else if(mode === 'simul') myState = targets[myId];
+
+        if(!myState || myState === 'locked') { 
+             document.getElementById('page-locked').style.display = 'flex'; 
+             localState = 'locked'; 
+             return; 
+        } else {
+             document.getElementById('page-locked').style.display = 'none';
+        }
+
+        renderBombState(myState);
+    }
+
+    function renderBombState(state) {
+        document.getElementById('page-safe').style.display = 'none';
+        document.getElementById('page-boom').style.display = 'none';
+        
+        if(state !== localState) {
+             // HARDCODED FIX V160
+             if ((localState === 'locked' || localState === 'lobby') && state === 'idle') speak("Attenzione, Attenzione. Postazione " + devName + " Attiva");
+             if (state === 'armed') speak("Attenzione, Attenzione. Timer " + devName + " Attivato");
+             if (state === 'defused') speak("Attenzione, Attenzione. Timer " + devName + " Disattivato");
+        }
+
+        localState = state; 
+        
+        if(state === 'idle') {
+            document.getElementById('lcd-2').innerText = "--:--"; 
+            document.body.style.background = "#000";
+        } else if(state === 'armed') {
+            document.getElementById('lcd-1').innerText = speedMultiplier > 1 ? "VELOCITA 2X" : "ARMATA";
+            document.body.style.background = "#300";
+        } else if(state === 'defused') {
+            document.getElementById('page-safe').style.display = 'flex'; 
+        } else if(state === 'exploded') {
+            document.getElementById('page-boom').style.display = 'flex'; 
+            if(lastSpeakSt !== 'exploded') { 
+                speak("Attenzione, Attenzione. Postazione " + devName + " Esplosa"); lastSpeakSt = 'exploded'; 
+            }
+        }
+    }
+
+    function renderReport() {
+        let box = document.getElementById('report-box');
+        box.innerHTML = "";
+        
+        if (gameState.config.sabMode === 'sequence') {
+            let defused = gameState.score ? gameState.score.defused : 0;
+            let exploded = gameState.score ? gameState.score.exploded : 0;
+            box.innerHTML = `
+                <div class="rep-row"><span>BOMBE DISINNESCATE:</span><span class="st-def">${defused}</span></div>
+                <div class="rep-row"><span>BOMBE ESPLOSE:</span><span class="st-boom">${exploded}</span></div>
+            `;
+        } else {
+            if (gameState.sabStates) {
+                Object.entries(gameState.sabStates).forEach(([id, st]) => {
+                    let name = (id === 'masterState') ? "MASTER" : (playersData[id]?.name || "ID:" + id.substr(-4));
+                    let cls = st==='exploded'?'st-boom':(st==='defused'?'st-def':'st-idle');
+                    let txt = st==='exploded'?'ESPLOSA':(st==='defused'?'DISINNESCATA':(st==='armed'?'ATTIVATA':'NON ATTIVATA'));
+                    box.innerHTML += `<div class="rep-row"><span>${name}</span><span class="${cls}">${txt}</span></div>`;
+                });
+            }
+        }
+    }
+
+    function updateTimers() {
+        // ASSASSIN FREEZE & TIME OUT CHECK
+        if(gameState.assassin && gameState.assassin.active) {
+            let d = Math.ceil((gameState.assassin.endTime - Date.now())/1000);
+            document.getElementById('ass-timer').innerText = fmt(Math.max(0, d));
+            if(d<=0 && myId===gameState.masterId) window.resolveAssassin(false);
+            return; // FREEZE
+        }
+
+        let now = Date.now();
+        if(gameState.config.endCondition === 'time') {
+            let globalDiff = Math.ceil((gameState.globalEndTime - now) / 1000);
+            if(globalDiff <= 0) globalDiff = 0;
+            document.getElementById('lcd-1').innerText = "TOT: " + fmt(globalDiff);
+        } else if (gameState.config.endCondition === 'cycles') {
+            let curr = (gameState.cycleCount || 0) + 1;
+            document.getElementById('lcd-1').innerText = "RND: " + curr + "/" + gameState.config.maxCycles;
+        }
+
+        if(localState === 'idle' && gameState.config.start === 'timer') {
+            let armTime = gameState.startTime + (gameState.config.armDelay * 60000);
+            let armDiff = Math.ceil((armTime - now) / 1000);
+            document.getElementById('lcd-2').innerText = "AUTO " + fmt(Math.max(0, armDiff));
+            if(armDiff <= 0 && myId === gameState.masterId) armBomb();
+        }
+
+        if (localState === 'armed' && gameState.currentBombEndTime) {
+            let bombDiff = Math.ceil((gameState.currentBombEndTime - now) / 1000);
+            if(bombDiff < 0) bombDiff = 0;
+            if(document.getElementById('page-boom').style.display === 'none') {
+                if(bombDiff === 0) reportExplosion();
+                document.getElementById('lcd-2').innerText = fmt(bombDiff);
+            }
+        }
+        
+        if(myId===gameState.masterId && gameState.assNext && now>gameState.assNext && (!gameState.assassin || !gameState.assassin.active)) {
+            if(gameState.assConfig && gameState.assConfig.active) triggerAssassin();
+        }
+    }
+
+    // AUDIO SIMPLE FIX V160
+    window.speak = (t) => {
+        window.speechSynthesis.cancel();
+        // t contiene già "Attenzione..."
+        let u = new SpeechSynthesisUtterance(t);
+        u.lang = 'it-IT'; u.rate = 0.9; u.pitch = 1.0;
+        window.speechSynthesis.speak(u);
+    };
+
+    window.broadcastStart = function() {
+        let minIn = parseInt(document.getElementById('ass-min').value);
+        let maxIn = parseInt(document.getElementById('ass-max').value);
+        let firstDelay = (minIn * 60000) + Math.random() * ((maxIn - minIn) * 60000);
+
+        let config = {
+            sabMode: document.getElementById('sab-mode').value,
+            endCondition: (document.getElementById('sab-mode').value === 'master') ? 'single' : document.getElementById('sab-end-cond').value,
+            globalDuration: parseInt(document.getElementById('sab-global-time').value) || 30,
+            maxCycles: parseInt(document.getElementById('sab-cycles').value) || 3,
+            bombDuration: parseInt(document.getElementById('sab-bomb-time').value) || 5,
+            start: document.getElementById('sab-start').value,
+            stop: document.getElementById('sab-stop').value,
+            armDelay: parseInt(document.getElementById('sab-arm-delay').value),
+            pin: document.getElementById('sab-pin').value,
+            pinPenalty: document.getElementById('sab-pin-penalty').value,
+            holdTime: parseInt(document.getElementById('sab-hold-time').value) * 1000,
+            drawerLock: document.getElementById('sab-drawer-lock').checked,
+            drawerPin: document.getElementById('sab-drawer-pin').value,
+            drawerPen: document.getElementById('sab-drawer-pen').value,
+            wireRoles: [ document.getElementById('role-0').value, document.getElementById('role-1').value, document.getElementById('role-2').value, document.getElementById('role-3').value ],
+            seqWires: [ parseInt(document.getElementById('seq-1').value), parseInt(document.getElementById('seq-2').value), parseInt(document.getElementById('seq-3').value), parseInt(document.getElementById('seq-4').value) ]
+        };
+
+        let assActive = document.getElementById('ass-active').checked;
+        let assConf = { active: false };
+        if(assActive) {
+            let actives = roster.filter(r => r.active).map(r => r.name);
+            if(actives.length === 0) { alert("Attiva nomi!"); return; }
+            assConf = { active: true, list: actives.join(','), dur: parseInt(document.getElementById('ass-dur').value), min: minIn, max: maxIn };
+        }
+
+        let payload = {
+            status: 'running', mode: 'sabotage', startTime: Date.now(),
+            globalEndTime: (config.endCondition === 'time') ? Date.now() + (config.globalDuration * 60000) : 0,
+            config: config, masterId: myId, cycleCount: 0, score: { defused: 0, exploded: 0 }, 
+            sabStates: {}, 
+            assConfig: assConf, 
+            assassin: { active: false }, 
+            assNext: assActive ? (Date.now() + firstDelay) : null
+        };
+
+        if(config.sabMode === 'master') payload.sabStates['masterState'] = 'idle';
+        if(config.sabMode === 'sequence') {
+            get(ref(db, 'players')).then(snap => {
+                let allPlayers = Object.keys(snap.val() || {});
+                let first = allPlayers[Math.floor(Math.random()*allPlayers.length)];
+                payload.currentTarget = first;
+                allPlayers.forEach(pid => {
+                    payload.sabStates[pid] = (pid === first) ? 'idle' : 'locked';
+                });
+                update(ref(db, 'game'), payload);
+            });
+            return;
+        } 
+        if(config.sabMode === 'simul') {
+            get(ref(db, 'players')).then(snap => {
+                let p = Object.keys(snap.val() || {});
+                p.forEach(pid => payload.sabStates[pid] = 'idle');
+                update(ref(db, 'game'), payload);
+            });
+            return;
+        }
+        update(ref(db, 'game'), payload);
+    };
+
+    function triggerAssassin() {
+        if(!gameState.assConfig || !gameState.assConfig.list) return; 
+        let l = gameState.assConfig.list.split(','); 
+        let t = l[Math.floor(Math.random()*l.length)];
+        
+        get(ref(db, 'players')).then(snap => {
+            let p = Object.values(snap.val() || {});
+            let dest = "BASE " + Math.floor(Math.random()*10);
+            if(p.length > 0) dest = p[Math.floor(Math.random()*p.length)].name || "BASE";
+            
+            speak("Attenzione, Attenzione. Missione prioritaria. Scortare " + t + " alla base " + dest);
+            update(ref(db, 'game/assassin'), {active:true, target:t, dest:dest, startTime:Date.now(), endTime:Date.now()+(gameState.assConfig.dur*60000)});
+        });
+    }
+    
+    // FIX V140: ATOMIC UPDATE FOR RESUME
+    window.resolveAssassin = function(killed) {
+        speak(killed ? "Attenzione, Attenzione. Giocatore Eliminato" : "Attenzione, Attenzione. Giocatore Salvo");
+        document.getElementById('ass-overlay').style.display = 'none'; 
+        
+        let elapsed = Date.now() - (gameState.assassin.startTime || Date.now());
+        let updates = {};
+        updates['game/assassin/active'] = false;
+        
+        // REFUND TIME
+        if(gameState.globalEndTime > 0) updates['game/globalEndTime'] = gameState.globalEndTime + elapsed;
+        if(gameState.currentBombEndTime > 0) updates['game/currentBombEndTime'] = gameState.currentBombEndTime + elapsed;
+
+        // SINGLE EVENT (NO NEXT)
+        updates['game/assNext'] = null;
+
+        update(ref(db), updates);
+    };
+
+    window.adminForceReset = function() { if(prompt("PWD")===document.getElementById('admin-pass').value) update(ref(db,'game'), {status:'lobby'}); };
+
+    window.toggleDrawer = function() {
+        let el = document.getElementById('cable-overlay');
+        if(el.style.display === 'flex') { el.style.display = 'none'; return; }
+        if(gameState.config.drawerLock) {
+            enteringDrawerPin = true; tempPin = "";
+            document.getElementById('lcd-1').innerText = "PIN VANO"; document.getElementById('lcd-3').innerText = "_ _ _ _";
+        } else el.style.display = 'flex';
+    };
+
+    window.kp = function(k) {
+        if(k === '#') { 
+            if(enteringDrawerPin) {
+                if(tempPin === gameState.config.drawerPin) { 
+                    enteringDrawerPin = false; document.getElementById('lcd-1').innerText = "APERTO"; setTimeout(() => { document.getElementById('cable-overlay').style.display = 'flex'; }, 500); 
+                } else {
+                    document.getElementById('lcd-1').innerText = "ERRATO"; 
+                    if(localState === 'armed') applyPenalty(gameState.config.drawerPen);
+                }
+                tempPin = ""; document.getElementById('lcd-3').innerText = ""; return;
+            }
+            if(gameState.config.pin === tempPin) {
+                if(localState === 'idle' && gameState.config.start === 'code') armBomb();
+                else if(localState === 'armed' && gameState.config.stop === 'code') disarmBomb();
+            } else if (localState === 'armed') {
+                applyPenalty(gameState.config.pinPenalty);
+            }
+            tempPin = ""; document.getElementById('lcd-3').innerText = "";
+        } 
+        else { tempPin += k; document.getElementById('lcd-3').innerText = tempPin; }
+    };
+
+    function applyPenalty(type) {
+        if(type === 'speed') { 
+            let rem = gameState.currentBombEndTime - Date.now();
+            update(ref(db), { 'game/currentBombEndTime': Date.now() + (rem / 2) });
+            alert("2X!"); 
+        }
+        if(type === 'time') { update(ref(db, 'game/currentBombEndTime'), gameState.currentBombEndTime - 60000); alert("-1 MIN"); }
+    }
+
+    window.btnDown = function(btn) {
+        if(gameState.mode === 'sabotage' && btn === 'A') {
+            let startM = gameState.config.start;
+            let stopM = gameState.config.stop;
+            if(localState === 'idle' && startM === 'press') armBomb();
+            else if(localState === 'armed' && stopM === 'press') disarmBomb();
+            if((localState === 'idle' && startM === 'hold') || (localState === 'armed' && stopM === 'hold')) startHoldAction();
+        }
+    };
+    window.btnUp = function(btn) { if(btn === 'A') stopHoldAction(); };
+
+    function startHoldAction() {
+        let b = document.getElementById('prog-bar-box'); b.style.display='block';
+        let f = document.getElementById('prog-bar-fill'); f.style.width='0%';
+        let s = Date.now();
+        holdTimer = setInterval(()=>{
+            let p = ((Date.now()-s)/gameState.config.holdTime)*100;
+            f.style.width = p+'%';
+            if(p>=100) { clearInterval(holdTimer); b.style.display='none'; if(localState==='idle') armBomb(); else disarmBomb(); }
+        },50);
+    }
+    function stopHoldAction() { clearInterval(holdTimer); document.getElementById('prog-bar-box').style.display='none'; }
+
+    window.cutWire = function(idx) {
+        let el = document.getElementById('w-'+idx);
+        el.classList.toggle('cut');
+        if(localState !== 'armed') {
+            if(localState === 'idle' && gameState.config.start === 'conn') {
+                if(!el.classList.contains('cut')) {
+                    userSeqInput.push(idx);
+                    if(userSeqInput.length === 4) {
+                        let ok = true; for(let i=0; i<4; i++) if(userSeqInput[i] !== gameState.config.seqWires[i]) ok=false;
+                        if(ok) { armBomb(); userSeqInput = []; toggleDrawer(); } 
+                        else { alert("ERRATO"); userSeqInput = []; for(let i=0; i<4; i++) document.getElementById('w-'+i).classList.add('cut'); }
+                    }
+                }
+            }
+            return;
+        } 
+        let role = gameState.config.wireRoles[idx];
+        if(role === 'def') disarmBomb(); else if(role === 'boom') reportExplosion(); else if(role === 'speed') applyPenalty('speed');
+    };
+
+    function armBomb() {
+        let tid = (gameState.config.sabMode === 'master') ? 'masterState' : myId;
+        update(ref(db), { [`game/sabStates/${tid}`]: 'armed', 'game/currentBombEndTime': Date.now() + (gameState.config.bombDuration * 60000), 'game/curName': devName });
+    }
+    function disarmBomb() { handleEndRound('defused'); }
+    function reportExplosion() { handleEndRound('exploded'); }
+
+    function handleEndRound(result) {
+        let tid = (gameState.config.sabMode === 'master') ? 'masterState' : myId;
+        let updates = {};
+        updates[`game/sabStates/${tid}`] = result;
+        
+        let currentScore = gameState.score || { defused: 0, exploded: 0 };
+        currentScore[result]++;
+        updates['game/score'] = currentScore;
+
+        let gameEnded = false;
+        if(gameState.config.endCondition === 'single') {
+            updates['game/status'] = 'ended'; updates['game/result'] = 'PARTITA TERMINATA'; gameEnded = true;
+        } else if(gameState.config.endCondition === 'cycles') {
+            let newCycle = (gameState.cycleCount || 0) + 1;
+            updates['game/cycleCount'] = newCycle;
+            if(newCycle >= gameState.config.maxCycles) { updates['game/status'] = 'ended'; updates['game/result'] = 'CICLI COMPLETATI'; gameEnded = true; }
+        }
+
+        if(gameState.config.sabMode === 'simul') {
+            get(ref(db, 'game/sabStates')).then(snap => {
+                let s = snap.val() || {};
+                s[tid] = result;
+                let done = true;
+                for(let k in s) { if(s[k]!=='defused' && s[k]!=='exploded') done=false; }
+                if(done) update(ref(db, 'game'), {status:'ended', result: 'TUTTI FINITI'});
+            });
+        }
+
+        if(!gameEnded && gameState.config.sabMode === 'sequence') {
+            update(ref(db), updates).then(() => {
+                setTimeout(() => {
+                    get(ref(db, 'players')).then(snap => {
+                        let p = Object.keys(snap.val()).filter(id => id !== myId);
+                        let next = p.length > 0 ? p[Math.floor(Math.random()*p.length)] : myId;
+                        let nextUpdate = {};
+                        nextUpdate['game/currentTarget'] = next; 
+                        nextUpdate[`game/sabStates/${next}`] = 'idle'; 
+                        update(ref(db), nextUpdate);
+                    });
+                }, 10000); 
+            });
+            return;
+        } else {
+            update(ref(db), updates);
+        }
+    }
+
+    // UTILS
+    window.speak = (t) => { let u=new SpeechSynthesisUtterance(t); u.lang='it-IT'; window.speechSynthesis.speak(u); };
+    window.openConf = function(m) {
+        document.querySelectorAll('.hidden').forEach(e => e.classList.add('hidden'));
+        document.getElementById('screen-menu').classList.remove('active');
+        document.getElementById('screen-conf').classList.add('active');
+        if(m==='sabotage') { document.getElementById('opt-sab').classList.remove('hidden'); updateSabUI(); }
+        if(m==='assassin') { document.getElementById('opt-ass').classList.remove('hidden'); renderRoster(); }
+    };
+    window.goHome = function() {
+        document.getElementById('screen-conf').classList.remove('active');
+        document.getElementById('screen-menu').classList.add('active');
+    };
+    function showScreen(id) {
+        document.querySelectorAll('.view-screen').forEach(e => e.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        resetOverlays();
+    }
+    function resetOverlays() {
+        document.getElementById('page-boom').style.display='none';
+        document.getElementById('page-safe').style.display='none';
+        document.getElementById('page-end').style.display='none';
+        document.getElementById('ass-overlay').style.display='none';
+        document.getElementById('page-locked').style.display='none';
+    }
+    function fmt(s) { var m=Math.floor(s/60); var sc=s%60; return (m<10?"0":"")+m+":"+(sc<10?"0":"")+sc; }
+</script>
+</body>
+</html>
