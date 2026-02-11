@@ -4,12 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>Softair OS V170 - Spectator</title>
-    <link rel="icon" type="image/png" href="icon.png">
+<title>Softair OS V170 - PWA EDITION</title>
+
+<link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<meta name="apple-mobile-web-app-title" content="Softair Bomb">
-    <link rel="manifest" href="manifest.json">
+<link rel="manifest" href="manifest.json">
+
 <style>
     /* --- STILI BASE (V160) --- */
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; font-family: 'Courier New', monospace; touch-action: manipulation; }
@@ -105,7 +108,7 @@
     #ass-overlay { position: absolute; top:0; left:0; width:100%; height:100%; z-index:200; background:rgba(50,0,0,0.95); display:none; flex-direction:column; justify-content:center; align-items:center; border: 4px solid red; }
     .ass-btn { width: 100%; padding: 20px; margin: 10px 0; font-size: 24px; font-weight: bold; border: 2px solid white; cursor: pointer; text-align: center; background: #000; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
 
-    /* SPECTATOR STYLES (NUOVO V170) */
+    /* SPECTATOR STYLES */
     #spec-header { color: #0f0; font-size: 24px; font-weight: bold; border-bottom: 2px solid #333; width: 100%; text-align: center; padding-bottom: 10px; margin-bottom: 10px; letter-spacing: 2px; }
     #spec-scores { display: flex; justify-content: space-between; width: 100%; margin-bottom: 20px; }
     .score-box { width: 48%; padding: 15px; text-align: center; font-size: 18px; font-weight: bold; border: 1px solid #333; border-radius: 4px; }
@@ -121,13 +124,10 @@
     
     .spec-card-armed { border-color: red; background: radial-gradient(circle, #300, #000); animation: pulseRed 1s infinite; }
     .spec-card-armed .spec-status { color: red; }
-    
     .spec-card-defused { border-color: #0f0; background: #001a00; }
     .spec-card-defused .spec-status { color: #0f0; }
-    
     .spec-card-exploded { border-color: #555; background: #222; opacity: 0.7; }
     .spec-card-exploded .spec-status { color: #888; text-decoration: line-through; }
-    
     .spec-card-idle { border-color: #444; }
     .spec-card-idle .spec-status { color: #666; }
 
@@ -186,15 +186,15 @@
     </div>
 
     <div id="screen-menu" class="view-screen active">
-        <div style="text-align:center; margin-bottom:20px; color:#444; font-size:10px;">TACTICAL OS V170.0</div>
+        <div style="text-align:center; margin-bottom:20px; color:#444; font-size:10px;">TACTICAL OS V170 (PWA)</div>
         
         <div style="margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
             <label>NOME POSTAZIONE:</label>
             <input type="text" id="dev-name" placeholder="ES: ALPHA" onchange="saveName()" style="text-align:center; font-weight:bold; color:yellow;">
         </div>
 
-        <button class="menu-btn" onclick="openConf('sabotage')">CONFIGURAZIONE PARTITA</button>
-        <button class="menu-btn btn-gray" onclick="openSpectator()">MODALITÀ SPETTATORE</button>
+        <button class="menu-btn" onclick="activateImmersion(); openConf('sabotage')">CONFIGURAZIONE PARTITA</button>
+        <button class="menu-btn btn-gray" onclick="activateImmersion(); openSpectator()">MODALITÀ SPETTATORE</button>
         
         <div style="margin-top:20px; border-top:1px solid #333; padding-top:10px;">
             <label>PASSWORD ADMIN:</label><input type="password" id="admin-pass" value="0000" style="text-align:center;">
@@ -352,6 +352,48 @@
     let playersData = {};
     let lastSpeakSt = "lobby";
 
+    // --- NUOVA LOGICA FULLSCREEN & WAKE LOCK ---
+    let wakeLock = null;
+    
+    async function requestWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                console.log('Wake Lock active');
+                wakeLock.addEventListener('release', () => console.log('Wake Lock released'));
+            } catch (err) { console.error(`${err.name}, ${err.message}`); }
+        }
+    }
+
+    function openFullscreen() {
+        let elem = document.documentElement;
+        if (elem.requestFullscreen) elem.requestFullscreen().catch(err => console.log(err));
+        else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
+        else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
+    }
+
+    // Inizializza audio (sblocco per mobile)
+    function initAudio() {
+        if('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            let u = new SpeechSynthesisUtterance('');
+            window.speechSynthesis.speak(u);
+        }
+    }
+
+    // Funzione "Master" per attivare tutto (si attiva al click dei bottoni menu)
+    window.activateImmersion = function() {
+        openFullscreen();
+        requestWakeLock();
+        initAudio();
+    };
+
+    // Re-lock se l'app torna visibile
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
+    });
+    // -------------------------------------------
+
     onValue(ref(db, ".info/connected"), s => {
         let el = document.getElementById('conn-status');
         el.innerText = s.val() ? "ONLINE" : "OFFLINE"; el.style.color = s.val() ? "#0f0" : "red";
@@ -366,11 +408,9 @@
 
     setInterval(() => { 
         if(gameState.status === 'running') updateTimers(); 
-        // V170: Update Spectator UI frequently
         if(document.getElementById('screen-spectator').classList.contains('active')) renderSpectatorUI();
     }, 1000);
 
-    // ROSTER & NAME
     window.saveName = function() {
         devName = document.getElementById('dev-name').value.toUpperCase();
         localStorage.setItem('bomb_dev_name', devName);
@@ -388,7 +428,6 @@
     window.toggleAss = function(index) { roster[index].active = !roster[index].active; saveRoster(); renderRoster(); };
     window.delAss = function(index) { roster.splice(index, 1); saveRoster(); renderRoster(); };
 
-    // UI
     window.updateSabUI = function() {
         let mode = document.getElementById('sab-mode').value;
         let start = document.getElementById('sab-start').value;
@@ -424,37 +463,25 @@
 
     function renderSpectatorUI() {
         if(!document.getElementById('screen-spectator').classList.contains('active')) return;
-
-        // SCORES
         let s = gameState.score || { defused: 0, exploded: 0 };
         document.getElementById('score-safe').innerText = s.defused;
         document.getElementById('score-boom').innerText = s.exploded;
-
-        // GRID
         let grid = document.getElementById('spec-grid');
         grid.innerHTML = "";
-
-        // Combine players and states
         let allIds = Object.keys(playersData);
         if(allIds.length === 0) { grid.innerHTML = "<div style='color:#666;width:100%;text-align:center;'>NESSUNA POSTAZIONE</div>"; return; }
-
         allIds.forEach(pid => {
             let pName = playersData[pid].name || "UNKNOWN";
             let pState = (gameState.sabStates && gameState.sabStates[pid]) ? gameState.sabStates[pid] : 'idle';
-            
-            // Override for Master in single mode
             if(gameState.config && gameState.config.sabMode === 'master' && pid === gameState.masterId) {
                 pState = gameState.sabStates['masterState'];
             }
-
             let cssClass = "spec-card-idle";
             let statusText = "STANDBY";
             let timeText = "--:--";
-
             if (pState === 'armed') {
                 cssClass = "spec-card-armed";
                 statusText = "ARMATA";
-                // Show global bomb timer if available
                 if(gameState.currentBombEndTime) {
                     let diff = Math.ceil((gameState.currentBombEndTime - Date.now())/1000);
                     timeText = diff > 0 ? fmt(diff) : "00:00";
@@ -468,14 +495,7 @@
             } else if (pState === 'locked') {
                 statusText = "LOCKED";
             }
-
-            grid.innerHTML += `
-            <div class="spec-card ${cssClass}">
-                <div class="spec-name">${pName}</div>
-                <div class="spec-status">${statusText}</div>
-                ${pState === 'armed' ? `<div class="spec-timer">${timeText}</div>` : ''}
-            </div>
-            `;
+            grid.innerHTML += `<div class="spec-card ${cssClass}"><div class="spec-name">${pName}</div><div class="spec-status">${statusText}</div>${pState === 'armed' ? `<div class="spec-timer">${timeText}</div>` : ''}</div>`;
         });
     }
 
@@ -483,7 +503,6 @@
         document.getElementById('drawer-handle').style.display = 'none';
         let allKeys = document.querySelectorAll('.key');
         allKeys.forEach(k => k.style.display = 'none'); 
-        
         if (mode === 'sabotage') {
             let btnA = document.getElementById('k-a');
             let start = config.start; let stop = config.stop;
@@ -500,7 +519,6 @@
 
     function applyGameState() {
         if(gameState.status === 'lobby') {
-            // Keep spectator on spectator screen if active
             if(!document.getElementById('screen-spectator').classList.contains('active')) {
                 showScreen('screen-menu');
             }
@@ -513,17 +531,13 @@
             document.body.style.background = "#000";
         }
         else if(gameState.status === 'running') {
-            // Spectator remains spectator
             if(!document.getElementById('screen-spectator').classList.contains('active')) {
                 showScreen('screen-game');
                 optimizeInterface('sabotage', gameState.config);
-                
                 if(localState === 'idle' && gameState.config.start === 'conn' && userSeqInput.length === 0) {
                     for(let i=0; i<4; i++) document.getElementById('w-'+i).classList.add('cut');
                 }
-
                 handleSabotageLogic();
-
                 if(gameState.assassin && gameState.assassin.active) {
                     document.getElementById('ass-overlay').style.display = 'flex';
                     document.getElementById('ass-target').innerText = gameState.assassin.target;
@@ -534,7 +548,6 @@
             }
         }
         else if(gameState.status === 'ended') {
-            // Spectator sees end summary in dashboard, player sees end screen
             if(!document.getElementById('screen-spectator').classList.contains('active')) {
                 document.getElementById('page-end').style.display = 'flex';
                 document.getElementById('end-reason').innerText = gameState.result || "FINE PARTITA";
@@ -546,15 +559,12 @@
 
     function handleSabotageLogic() {
         if(gameState.status === 'lobby') { resetOverlays(); return; }
-
         let mode = gameState.config.sabMode;
         let targets = gameState.sabStates || {}; 
         let myState = targets[myId];
-        
         if(mode === 'master') { if(myId === gameState.masterId) { myState = targets['masterState']; } }
         else if(mode === 'sequence') { if(gameState.currentTarget === myId) myState = targets[myId]; }
         else if(mode === 'simul') myState = targets[myId];
-
         if(!myState || myState === 'locked') { 
              document.getElementById('page-locked').style.display = 'flex'; 
              localState = 'locked'; 
@@ -562,23 +572,18 @@
         } else {
              document.getElementById('page-locked').style.display = 'none';
         }
-
         renderBombState(myState);
     }
 
     function renderBombState(state) {
         document.getElementById('page-safe').style.display = 'none';
         document.getElementById('page-boom').style.display = 'none';
-        
         if(state !== localState) {
-             // HARDCODED FIX V160
              if ((localState === 'locked' || localState === 'lobby') && state === 'idle') speak("Attenzione, Attenzione. Postazione " + devName + " Attiva");
              if (state === 'armed') speak("Attenzione, Attenzione. Timer " + devName + " Attivato");
              if (state === 'defused') speak("Attenzione, Attenzione. Timer " + devName + " Disattivato");
         }
-
         localState = state; 
-        
         if(state === 'idle') {
             document.getElementById('lcd-2').innerText = "--:--"; 
             document.body.style.background = "#000";
@@ -598,14 +603,10 @@
     function renderReport() {
         let box = document.getElementById('report-box');
         box.innerHTML = "";
-        
         if (gameState.config.sabMode === 'sequence') {
             let defused = gameState.score ? gameState.score.defused : 0;
             let exploded = gameState.score ? gameState.score.exploded : 0;
-            box.innerHTML = `
-                <div class="rep-row"><span>BOMBE DISINNESCATE:</span><span class="st-def">${defused}</span></div>
-                <div class="rep-row"><span>BOMBE ESPLOSE:</span><span class="st-boom">${exploded}</span></div>
-            `;
+            box.innerHTML = `<div class="rep-row"><span>BOMBE DISINNESCATE:</span><span class="st-def">${defused}</span></div><div class="rep-row"><span>BOMBE ESPLOSE:</span><span class="st-boom">${exploded}</span></div>`;
         } else {
             if (gameState.sabStates) {
                 Object.entries(gameState.sabStates).forEach(([id, st]) => {
@@ -619,14 +620,12 @@
     }
 
     function updateTimers() {
-        // ASSASSIN FREEZE & TIME OUT CHECK
         if(gameState.assassin && gameState.assassin.active) {
             let d = Math.ceil((gameState.assassin.endTime - Date.now())/1000);
             document.getElementById('ass-timer').innerText = fmt(Math.max(0, d));
             if(d<=0 && myId===gameState.masterId) window.resolveAssassin(false);
-            return; // FREEZE
+            return; 
         }
-
         let now = Date.now();
         if(gameState.config.endCondition === 'time') {
             let globalDiff = Math.ceil((gameState.globalEndTime - now) / 1000);
@@ -636,14 +635,12 @@
             let curr = (gameState.cycleCount || 0) + 1;
             document.getElementById('lcd-1').innerText = "RND: " + curr + "/" + gameState.config.maxCycles;
         }
-
         if(localState === 'idle' && gameState.config.start === 'timer') {
             let armTime = gameState.startTime + (gameState.config.armDelay * 60000);
             let armDiff = Math.ceil((armTime - now) / 1000);
             document.getElementById('lcd-2').innerText = "AUTO " + fmt(Math.max(0, armDiff));
             if(armDiff <= 0 && myId === gameState.masterId) armBomb();
         }
-
         if (localState === 'armed' && gameState.currentBombEndTime) {
             let bombDiff = Math.ceil((gameState.currentBombEndTime - now) / 1000);
             if(bombDiff < 0) bombDiff = 0;
@@ -652,16 +649,13 @@
                 document.getElementById('lcd-2').innerText = fmt(bombDiff);
             }
         }
-        
         if(myId===gameState.masterId && gameState.assNext && now>gameState.assNext && (!gameState.assassin || !gameState.assassin.active)) {
             if(gameState.assConfig && gameState.assConfig.active) triggerAssassin();
         }
     }
 
-    // AUDIO SIMPLE FIX V160
     window.speak = (t) => {
         window.speechSynthesis.cancel();
-        // t contiene già "Attenzione..."
         let u = new SpeechSynthesisUtterance(t);
         u.lang = 'it-IT'; u.rate = 0.9; u.pitch = 1.0;
         window.speechSynthesis.speak(u);
@@ -671,7 +665,6 @@
         let minIn = parseInt(document.getElementById('ass-min').value);
         let maxIn = parseInt(document.getElementById('ass-max').value);
         let firstDelay = (minIn * 60000) + Math.random() * ((maxIn - minIn) * 60000);
-
         let config = {
             sabMode: document.getElementById('sab-mode').value,
             endCondition: (document.getElementById('sab-mode').value === 'master') ? 'single' : document.getElementById('sab-end-cond').value,
@@ -690,7 +683,6 @@
             wireRoles: [ document.getElementById('role-0').value, document.getElementById('role-1').value, document.getElementById('role-2').value, document.getElementById('role-3').value ],
             seqWires: [ parseInt(document.getElementById('seq-1').value), parseInt(document.getElementById('seq-2').value), parseInt(document.getElementById('seq-3').value), parseInt(document.getElementById('seq-4').value) ]
         };
-
         let assActive = document.getElementById('ass-active').checked;
         let assConf = { active: false };
         if(assActive) {
@@ -698,26 +690,19 @@
             if(actives.length === 0) { alert("Attiva nomi!"); return; }
             assConf = { active: true, list: actives.join(','), dur: parseInt(document.getElementById('ass-dur').value), min: minIn, max: maxIn };
         }
-
         let payload = {
             status: 'running', mode: 'sabotage', startTime: Date.now(),
             globalEndTime: (config.endCondition === 'time') ? Date.now() + (config.globalDuration * 60000) : 0,
             config: config, masterId: myId, cycleCount: 0, score: { defused: 0, exploded: 0 }, 
-            sabStates: {}, 
-            assConfig: assConf, 
-            assassin: { active: false }, 
-            assNext: assActive ? (Date.now() + firstDelay) : null
+            sabStates: {}, assConfig: assConf, assassin: { active: false }, assNext: assActive ? (Date.now() + firstDelay) : null
         };
-
         if(config.sabMode === 'master') payload.sabStates['masterState'] = 'idle';
         if(config.sabMode === 'sequence') {
             get(ref(db, 'players')).then(snap => {
                 let allPlayers = Object.keys(snap.val() || {});
                 let first = allPlayers[Math.floor(Math.random()*allPlayers.length)];
                 payload.currentTarget = first;
-                allPlayers.forEach(pid => {
-                    payload.sabStates[pid] = (pid === first) ? 'idle' : 'locked';
-                });
+                allPlayers.forEach(pid => { payload.sabStates[pid] = (pid === first) ? 'idle' : 'locked'; });
                 update(ref(db, 'game'), payload);
             });
             return;
@@ -737,33 +722,24 @@
         if(!gameState.assConfig || !gameState.assConfig.list) return; 
         let l = gameState.assConfig.list.split(','); 
         let t = l[Math.floor(Math.random()*l.length)];
-        
         get(ref(db, 'players')).then(snap => {
             let p = Object.values(snap.val() || {});
             let dest = "BASE " + Math.floor(Math.random()*10);
             if(p.length > 0) dest = p[Math.floor(Math.random()*p.length)].name || "BASE";
-            
             speak("Attenzione, Attenzione. Missione prioritaria. Scortare " + t + " alla base " + dest);
             update(ref(db, 'game/assassin'), {active:true, target:t, dest:dest, startTime:Date.now(), endTime:Date.now()+(gameState.assConfig.dur*60000)});
         });
     }
     
-    // FIX V140: ATOMIC UPDATE FOR RESUME
     window.resolveAssassin = function(killed) {
         speak(killed ? "Attenzione, Attenzione. Giocatore Eliminato" : "Attenzione, Attenzione. Giocatore Salvo");
         document.getElementById('ass-overlay').style.display = 'none'; 
-        
         let elapsed = Date.now() - (gameState.assassin.startTime || Date.now());
         let updates = {};
         updates['game/assassin/active'] = false;
-        
-        // REFUND TIME
         if(gameState.globalEndTime > 0) updates['game/globalEndTime'] = gameState.globalEndTime + elapsed;
         if(gameState.currentBombEndTime > 0) updates['game/currentBombEndTime'] = gameState.currentBombEndTime + elapsed;
-
-        // SINGLE EVENT (NO NEXT)
         updates['game/assNext'] = null;
-
         update(ref(db), updates);
     };
 
@@ -863,11 +839,9 @@
         let tid = (gameState.config.sabMode === 'master') ? 'masterState' : myId;
         let updates = {};
         updates[`game/sabStates/${tid}`] = result;
-        
         let currentScore = gameState.score || { defused: 0, exploded: 0 };
         currentScore[result]++;
         updates['game/score'] = currentScore;
-
         let gameEnded = false;
         if(gameState.config.endCondition === 'single') {
             updates['game/status'] = 'ended'; updates['game/result'] = 'PARTITA TERMINATA'; gameEnded = true;
@@ -876,7 +850,6 @@
             updates['game/cycleCount'] = newCycle;
             if(newCycle >= gameState.config.maxCycles) { updates['game/status'] = 'ended'; updates['game/result'] = 'CICLI COMPLETATI'; gameEnded = true; }
         }
-
         if(gameState.config.sabMode === 'simul') {
             get(ref(db, 'game/sabStates')).then(snap => {
                 let s = snap.val() || {};
@@ -886,7 +859,6 @@
                 if(done) update(ref(db, 'game'), {status:'ended', result: 'TUTTI FINITI'});
             });
         }
-
         if(!gameEnded && gameState.config.sabMode === 'sequence') {
             update(ref(db), updates).then(() => {
                 setTimeout(() => {
@@ -906,8 +878,6 @@
         }
     }
 
-    // UTILS
-    window.speak = (t) => { let u=new SpeechSynthesisUtterance(t); u.lang='it-IT'; window.speechSynthesis.speak(u); };
     window.openConf = function(m) {
         document.querySelectorAll('.hidden').forEach(e => e.classList.add('hidden'));
         document.getElementById('screen-menu').classList.remove('active');
@@ -934,6 +904,4 @@
     function fmt(s) { var m=Math.floor(s/60); var sc=s%60; return (m<10?"0":"")+m+":"+(sc<10?"0":"")+sc; }
 </script>
 </body>
-
 </html>
-
