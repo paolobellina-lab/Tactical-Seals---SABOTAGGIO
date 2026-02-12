@@ -7,14 +7,14 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>Softair OS V170 - PWA EDITION</title>
+<title>Softair OS V170.5 - GLOBAL AUDIO</title>
 
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
 <link rel="manifest" href="manifest.json">
 
 <style>
-    /* --- STILI BASE (V160) --- */
+    /* --- STILI BASE --- */
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; font-family: 'Courier New', monospace; touch-action: manipulation; }
     html, body { background-color: #050505; color: #0f0; margin: 0; height: 100%; width: 100%; overflow: hidden; display: flex; justify-content: center; align-items: center; position: fixed; }
     #phone-frame { width: 100%; max-width: 450px; height: 100%; max-height: 900px; background-color: #000; border: 2px solid #333; display: flex; flex-direction: column; position: relative; overflow: hidden; box-shadow: 0 0 50px rgba(0,255,0,0.1); }
@@ -69,7 +69,6 @@
     .key:active { background: #333; transform: translateY(2px); box-shadow: 0 1px 0 #000; }
     .k-red { background: #600; border-color: #800; grid-area: btnA; } 
     #k-a { font-size: 10px; line-height: 12px; text-align: center; flex-direction: column; color:#ddd; text-transform: uppercase; }
-    
     .k-blu { background: #006; border-color: #008; grid-area: btnB; }
     .k-yel { background: #660; border-color: #880; grid-area: btnC; } 
     .k-grn { background: #060; border-color: #080; grid-area: btnD; }
@@ -115,13 +114,11 @@
     .score-box.def { background: #003300; border-color: #0f0; color: #0f0; }
     .score-box.boom { background: #330000; border-color: #f00; color: #f00; }
     .score-box span { display: block; font-size: 30px; margin-top: 5px; }
-    
     #spec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; overflow-y: auto; padding-bottom: 20px; }
     .spec-card { background: #111; border: 1px solid #333; padding: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 80px; position: relative; }
     .spec-name { font-size: 12px; color: #888; font-weight: bold; margin-bottom: 5px; text-transform: uppercase; }
     .spec-status { font-size: 16px; font-weight: bold; }
     .spec-timer { font-size: 20px; font-family: sans-serif; margin-top: 5px; color: #fff; }
-    
     .spec-card-armed { border-color: red; background: radial-gradient(circle, #300, #000); animation: pulseRed 1s infinite; }
     .spec-card-armed .spec-status { color: red; }
     .spec-card-defused { border-color: #0f0; background: #001a00; }
@@ -130,7 +127,6 @@
     .spec-card-exploded .spec-status { color: #888; text-decoration: line-through; }
     .spec-card-idle { border-color: #444; }
     .spec-card-idle .spec-status { color: #666; }
-
     @keyframes pulseRed { 0% { box-shadow: 0 0 5px #500; } 50% { box-shadow: 0 0 15px #f00; } 100% { box-shadow: 0 0 5px #500; } }
 </style>
 </head>
@@ -186,7 +182,7 @@
     </div>
 
     <div id="screen-menu" class="view-screen active">
-        <div style="text-align:center; margin-bottom:20px; color:#444; font-size:10px;">TACTICAL OS V170 (PWA)</div>
+        <div style="text-align:center; margin-bottom:20px; color:#444; font-size:10px;">TACTICAL OS V170.5 (GLOBAL AUDIO)</div>
         
         <div style="margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
             <label>NOME POSTAZIONE:</label>
@@ -350,49 +346,35 @@
     let devName = localStorage.getItem('bomb_dev_name') || "POSTAZIONE " + Math.floor(Math.random()*100);
     document.getElementById('dev-name').value = devName;
     let playersData = {};
-    let lastSpeakSt = "lobby";
+    let lastAudioTime = 0; // Fix duplicate audio
 
-    // --- NUOVA LOGICA FULLSCREEN & WAKE LOCK ---
+    // --- IMMERSION: AUDIO & WAKE LOCK ---
     let wakeLock = null;
-    
     async function requestWakeLock() {
         if ('wakeLock' in navigator) {
-            try {
-                wakeLock = await navigator.wakeLock.request('screen');
-                console.log('Wake Lock active');
-                wakeLock.addEventListener('release', () => console.log('Wake Lock released'));
-            } catch (err) { console.error(`${err.name}, ${err.message}`); }
+            try { wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
         }
     }
-
+    document.addEventListener('visibilitychange', async () => {
+        if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
+    });
     function openFullscreen() {
         let elem = document.documentElement;
-        if (elem.requestFullscreen) elem.requestFullscreen().catch(err => console.log(err));
+        if (elem.requestFullscreen) elem.requestFullscreen();
         else if (elem.webkitRequestFullscreen) elem.webkitRequestFullscreen();
-        else if (elem.msRequestFullscreen) elem.msRequestFullscreen();
     }
-
-    // Inizializza audio (sblocco per mobile)
     function initAudio() {
         if('speechSynthesis' in window) {
             window.speechSynthesis.cancel();
-            let u = new SpeechSynthesisUtterance('');
-            window.speechSynthesis.speak(u);
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance(''));
         }
     }
-
-    // Funzione "Master" per attivare tutto (si attiva al click dei bottoni menu)
     window.activateImmersion = function() {
         openFullscreen();
         requestWakeLock();
         initAudio();
     };
-
-    // Re-lock se l'app torna visibile
-    document.addEventListener('visibilitychange', async () => {
-        if (wakeLock !== null && document.visibilityState === 'visible') await requestWakeLock();
-    });
-    // -------------------------------------------
+    // ------------------------------------
 
     onValue(ref(db, ".info/connected"), s => {
         let el = document.getElementById('conn-status');
@@ -406,11 +388,24 @@
         applyGameState();
     });
 
+    // --- GLOBAL AUDIO LISTENER ---
+    onValue(ref(db, 'game/sysAudio'), (snap) => {
+        let val = snap.val();
+        if(val && val.time > lastAudioTime) {
+            lastAudioTime = val.time;
+            // Play audio if within 10 seconds of event (prevents old events on reload)
+            if (Date.now() - val.time < 10000) {
+                speak(val.text);
+            }
+        }
+    });
+
     setInterval(() => { 
         if(gameState.status === 'running') updateTimers(); 
         if(document.getElementById('screen-spectator').classList.contains('active')) renderSpectatorUI();
     }, 1000);
 
+    // UTILS
     window.saveName = function() {
         devName = document.getElementById('dev-name').value.toUpperCase();
         localStorage.setItem('bomb_dev_name', devName);
@@ -524,7 +519,6 @@
             }
             resetOverlays();
             localState = 'lobby'; 
-            lastSpeakSt = 'lobby';
             speedMultiplier = 1.0;
             document.getElementById('lcd-1').innerText = "SISTEMA";
             document.getElementById('lcd-2').innerText = "PRONTO";
@@ -552,7 +546,6 @@
                 document.getElementById('page-end').style.display = 'flex';
                 document.getElementById('end-reason').innerText = gameState.result || "FINE PARTITA";
                 renderReport();
-                if(gameState.result !== 'BOOM' && lastSpeakSt !== 'ended') { speak("Attenzione, Attenzione. Fine Partita"); lastSpeakSt = 'ended'; }
             }
         }
     }
@@ -578,11 +571,7 @@
     function renderBombState(state) {
         document.getElementById('page-safe').style.display = 'none';
         document.getElementById('page-boom').style.display = 'none';
-        if(state !== localState) {
-             if ((localState === 'locked' || localState === 'lobby') && state === 'idle') speak("Attenzione, Attenzione. Postazione " + devName + " Attiva");
-             if (state === 'armed') speak("Attenzione, Attenzione. Timer " + devName + " Attivato");
-             if (state === 'defused') speak("Attenzione, Attenzione. Timer " + devName + " Disattivato");
-        }
+        // Note: Client-side speech trigger removed to prefer server-side sync
         localState = state; 
         if(state === 'idle') {
             document.getElementById('lcd-2').innerText = "--:--"; 
@@ -594,9 +583,6 @@
             document.getElementById('page-safe').style.display = 'flex'; 
         } else if(state === 'exploded') {
             document.getElementById('page-boom').style.display = 'flex'; 
-            if(lastSpeakSt !== 'exploded') { 
-                speak("Attenzione, Attenzione. Postazione " + devName + " Esplosa"); lastSpeakSt = 'exploded'; 
-            }
         }
     }
 
@@ -645,7 +631,7 @@
             let bombDiff = Math.ceil((gameState.currentBombEndTime - now) / 1000);
             if(bombDiff < 0) bombDiff = 0;
             if(document.getElementById('page-boom').style.display === 'none') {
-                if(bombDiff === 0) reportExplosion();
+                if(bombDiff === 0 && myId === gameState.masterId) reportExplosion(); // Only Master triggers end logic
                 document.getElementById('lcd-2').innerText = fmt(bombDiff);
             }
         }
@@ -654,6 +640,7 @@
         }
     }
 
+    // AUDIO SYSTEM
     window.speak = (t) => {
         window.speechSynthesis.cancel();
         let u = new SpeechSynthesisUtterance(t);
@@ -694,7 +681,8 @@
             status: 'running', mode: 'sabotage', startTime: Date.now(),
             globalEndTime: (config.endCondition === 'time') ? Date.now() + (config.globalDuration * 60000) : 0,
             config: config, masterId: myId, cycleCount: 0, score: { defused: 0, exploded: 0 }, 
-            sabStates: {}, assConfig: assConf, assassin: { active: false }, assNext: assActive ? (Date.now() + firstDelay) : null
+            sabStates: {}, assConfig: assConf, assassin: { active: false }, assNext: assActive ? (Date.now() + firstDelay) : null,
+            sysAudio: { text: "Partita Avviata", time: Date.now() }
         };
         if(config.sabMode === 'master') payload.sabStates['masterState'] = 'idle';
         if(config.sabMode === 'sequence') {
@@ -726,20 +714,24 @@
             let p = Object.values(snap.val() || {});
             let dest = "BASE " + Math.floor(Math.random()*10);
             if(p.length > 0) dest = p[Math.floor(Math.random()*p.length)].name || "BASE";
-            speak("Attenzione, Attenzione. Missione prioritaria. Scortare " + t + " alla base " + dest);
-            update(ref(db, 'game/assassin'), {active:true, target:t, dest:dest, startTime:Date.now(), endTime:Date.now()+(gameState.assConfig.dur*60000)});
+            
+            // Trigger Sync Audio
+            update(ref(db, 'game'), {
+                assassin: {active:true, target:t, dest:dest, startTime:Date.now(), endTime:Date.now()+(gameState.assConfig.dur*60000)},
+                sysAudio: { text: "Attenzione, Attenzione. Missione prioritaria. Scortare " + t + " alla base " + dest, time: Date.now() }
+            });
         });
     }
     
     window.resolveAssassin = function(killed) {
-        speak(killed ? "Attenzione, Attenzione. Giocatore Eliminato" : "Attenzione, Attenzione. Giocatore Salvo");
-        document.getElementById('ass-overlay').style.display = 'none'; 
+        let msg = killed ? "Attenzione, Attenzione. Giocatore Eliminato" : "Attenzione, Attenzione. Giocatore Salvo";
         let elapsed = Date.now() - (gameState.assassin.startTime || Date.now());
         let updates = {};
         updates['game/assassin/active'] = false;
         if(gameState.globalEndTime > 0) updates['game/globalEndTime'] = gameState.globalEndTime + elapsed;
         if(gameState.currentBombEndTime > 0) updates['game/currentBombEndTime'] = gameState.currentBombEndTime + elapsed;
         updates['game/assNext'] = null;
+        updates['game/sysAudio'] = { text: msg, time: Date.now() };
         update(ref(db), updates);
     };
 
@@ -830,7 +822,12 @@
 
     function armBomb() {
         let tid = (gameState.config.sabMode === 'master') ? 'masterState' : myId;
-        update(ref(db), { [`game/sabStates/${tid}`]: 'armed', 'game/currentBombEndTime': Date.now() + (gameState.config.bombDuration * 60000), 'game/curName': devName });
+        update(ref(db), { 
+            [`game/sabStates/${tid}`]: 'armed', 
+            'game/currentBombEndTime': Date.now() + (gameState.config.bombDuration * 60000), 
+            'game/curName': devName,
+            'game/sysAudio': { text: "Attenzione, Attenzione. Timer " + devName + " Attivato", time: Date.now() }
+        });
     }
     function disarmBomb() { handleEndRound('defused'); }
     function reportExplosion() { handleEndRound('exploded'); }
@@ -839,35 +836,50 @@
         let tid = (gameState.config.sabMode === 'master') ? 'masterState' : myId;
         let updates = {};
         updates[`game/sabStates/${tid}`] = result;
+        
+        let msg = (result === 'defused') ? "Attenzione, Attenzione. Timer " + devName + " Disattivato" : "Attenzione, Attenzione. Postazione " + devName + " Esplosa";
+        updates['game/sysAudio'] = { text: msg, time: Date.now() };
+
         let currentScore = gameState.score || { defused: 0, exploded: 0 };
         currentScore[result]++;
         updates['game/score'] = currentScore;
+
         let gameEnded = false;
         if(gameState.config.endCondition === 'single') {
-            updates['game/status'] = 'ended'; updates['game/result'] = 'PARTITA TERMINATA'; gameEnded = true;
+            updates['game/status'] = 'ended'; updates['game/result'] = 'PARTITA TERMINATA'; 
+            updates['game/sysAudio'] = { text: "Fine Partita", time: Date.now() + 100 };
+            gameEnded = true;
         } else if(gameState.config.endCondition === 'cycles') {
             let newCycle = (gameState.cycleCount || 0) + 1;
             updates['game/cycleCount'] = newCycle;
-            if(newCycle >= gameState.config.maxCycles) { updates['game/status'] = 'ended'; updates['game/result'] = 'CICLI COMPLETATI'; gameEnded = true; }
+            if(newCycle >= gameState.config.maxCycles) { 
+                updates['game/status'] = 'ended'; updates['game/result'] = 'CICLI COMPLETATI'; 
+                updates['game/sysAudio'] = { text: "Fine Partita. Cicli completati.", time: Date.now() + 100 };
+                gameEnded = true; 
+            }
         }
+
         if(gameState.config.sabMode === 'simul') {
             get(ref(db, 'game/sabStates')).then(snap => {
                 let s = snap.val() || {};
                 s[tid] = result;
                 let done = true;
                 for(let k in s) { if(s[k]!=='defused' && s[k]!=='exploded') done=false; }
-                if(done) update(ref(db, 'game'), {status:'ended', result: 'TUTTI FINITI'});
+                if(done) update(ref(db, 'game'), {status:'ended', result: 'TUTTI FINITI', sysAudio: {text:"Fine Partita. Tutti gli obiettivi completati", time: Date.now()}});
             });
         }
+
         if(!gameEnded && gameState.config.sabMode === 'sequence') {
             update(ref(db), updates).then(() => {
                 setTimeout(() => {
                     get(ref(db, 'players')).then(snap => {
                         let p = Object.keys(snap.val()).filter(id => id !== myId);
                         let next = p.length > 0 ? p[Math.floor(Math.random()*p.length)] : myId;
+                        let pName = snap.val()[next].name || "SUCCESSIVA";
                         let nextUpdate = {};
                         nextUpdate['game/currentTarget'] = next; 
                         nextUpdate[`game/sabStates/${next}`] = 'idle'; 
+                        nextUpdate['game/sysAudio'] = { text: "Attenzione. Postazione " + pName + " Attiva", time: Date.now() };
                         update(ref(db), nextUpdate);
                     });
                 }, 10000); 
