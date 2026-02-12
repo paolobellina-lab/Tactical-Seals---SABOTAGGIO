@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#000000">
-<title>Softair OS V170.5 - GLOBAL AUDIO</title>
+<title>Softair OS V170.6 - SMART START</title>
 
 <link rel="icon" type="image/png" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
@@ -182,7 +182,7 @@
     </div>
 
     <div id="screen-menu" class="view-screen active">
-        <div style="text-align:center; margin-bottom:20px; color:#444; font-size:10px;">TACTICAL OS V170.5 (GLOBAL AUDIO)</div>
+        <div style="text-align:center; margin-bottom:20px; color:#444; font-size:10px;">TACTICAL OS V170.6 (SMART START)</div>
         
         <div style="margin-bottom:15px; border-bottom:1px solid #333; padding-bottom:10px;">
             <label>NOME POSTAZIONE:</label>
@@ -682,15 +682,26 @@
             globalEndTime: (config.endCondition === 'time') ? Date.now() + (config.globalDuration * 60000) : 0,
             config: config, masterId: myId, cycleCount: 0, score: { defused: 0, exploded: 0 }, 
             sabStates: {}, assConfig: assConf, assassin: { active: false }, assNext: assActive ? (Date.now() + firstDelay) : null,
-            sysAudio: { text: "Partita Avviata", time: Date.now() }
+            sysAudio: null // AUDIO REMOVED FROM HERE
         };
-        if(config.sabMode === 'master') payload.sabStates['masterState'] = 'idle';
+        if(config.sabMode === 'master') {
+            payload.sabStates['masterState'] = 'idle';
+            // NEW: AUDIO FOR MASTER
+            payload.sysAudio = { text: "Attenzione. Postazione " + devName + " Attiva", time: Date.now() };
+        }
         if(config.sabMode === 'sequence') {
             get(ref(db, 'players')).then(snap => {
-                let allPlayers = Object.keys(snap.val() || {});
+                let players = snap.val() || {};
+                let allPlayers = Object.keys(players);
                 let first = allPlayers[Math.floor(Math.random()*allPlayers.length)];
+                let firstName = players[first].name || "SCONOSCIUTA"; // Get Name
+
                 payload.currentTarget = first;
                 allPlayers.forEach(pid => { payload.sabStates[pid] = (pid === first) ? 'idle' : 'locked'; });
+                
+                // NEW: AUDIO FOR SEQUENCE
+                payload.sysAudio = { text: "Attenzione. Postazione " + firstName + " Attiva", time: Date.now() };
+
                 update(ref(db, 'game'), payload);
             });
             return;
@@ -699,6 +710,8 @@
             get(ref(db, 'players')).then(snap => {
                 let p = Object.keys(snap.val() || {});
                 p.forEach(pid => payload.sabStates[pid] = 'idle');
+                // NEW: AUDIO FOR SIMUL
+                payload.sysAudio = { text: "Attenzione. Tutte le postazioni attive", time: Date.now() };
                 update(ref(db, 'game'), payload);
             });
             return;
